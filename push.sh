@@ -1,13 +1,6 @@
 #!/bin/bash
 
-# Usage: ./commit.sh "<commit message>"
-
-commit_message="$1"
-
-if [ -z "$commit_message" ]; then
-    echo "Usage: $0 \"<commit message>\""
-    exit 1
-fi
+# Usage: ./push.sh
 
 # Find all git repositories (both .git folders and gitfiles), deepest first
 git_dirs=$(find . \( -type d -name ".git" -o -type f -name ".git" \) | sort -r)
@@ -20,15 +13,17 @@ for git_entry in $git_dirs; do
     
     # Verify it's a git repo
     if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-        # Check if there are any changes
-        if [[ -n $(git status --porcelain) ]]; then
-            echo "  Adding changes..."
-            git add .
-            
-            echo "  Committing changes..."
-            git commit -m "$commit_message"
+        # Get current branch
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        
+        # Check if branch has an upstream
+        upstream=$(git rev-parse --abbrev-ref "$branch@{upstream}" 2>/dev/null)
+        
+        if [ -n "$upstream" ]; then
+            echo "  Pushing branch '$branch' to '$upstream'..."
+            git push
         else
-            echo "  No changes to commit."
+            echo "  No upstream configured for branch '$branch'. Skipping push."
         fi
     else
         echo "  Not a valid git repository: $repo_dir"
