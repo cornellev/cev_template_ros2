@@ -1,32 +1,40 @@
 #!/bin/bash
 
-# Usage: ./commit.sh <commit_message>
-echo "here"
+# Usage: ./commit_all.sh "<commit message>"
 
-# Check if a commit message is provided
-if [ -z "$1" ]; then
-  echo "Usage: $0 <commit_message>"
-  exit 1
+commit_message="$1"
+
+if [ -z "$commit_message" ]; then
+    echo "Usage: $0 \"<commit message>\""
+    exit 1
 fi
 
-og_pwd=$(pwd)
+# Find all git repositories (both .git folders and gitfiles), deepest first
+git_dirs=$(find . \( -type d -name ".git" -o -type f -name ".git" \) | sort -r)
 
-find . -name .git | while read -r git_dir; do
-  directory=$(echo "$git_dir" | rev | cut -d'/' -f2- | rev)
-  cd $directory
-  git add .
-  git commit --dry-run -m "$1"
-  if [ $? -ne 0 ]; then
-    echo "Failed to commit in $directory"
-    exit 1
-  fi
-  cd $og_pwd 
+for git_entry in $git_dirs; do
+    repo_dir=$(dirname "$git_entry")
+    echo "Processing repository: $repo_dir"
+    
+    cd "$repo_dir" || continue
+    
+    # Verify it's a git repo
+    if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+        # Check if there are any changes
+        if [[ -n $(git status --porcelain) ]]; then
+            echo "  Adding changes..."
+            git add .
+            
+            echo "  Committing changes..."
+            git commit -m "$commit_message"
+        else
+            echo "  No changes to commit."
+        fi
+    else
+        echo "  Not a valid git repository: $repo_dir"
+    fi
+
+    cd - > /dev/null
 done
 
-find . -name .git | while read -r git_dir; do
-  directory=$(echo "$git_dir" | rev | cut -d'/' -f2- | rev)
-  cd $directory
-  git add .
-  git commit -m "$1"
-  cd $og_pwd
-done
+echo "All repositories processed."
